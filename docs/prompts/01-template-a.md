@@ -1,7 +1,9 @@
 # Template A — Core Skeleton
-> Rationale: First build prompt. PLANNING mode. Establishes all 4 screens, Firestore schema,
-> Gemini score-variance feature, seed data, runtime Firebase config pattern, and Dockerfile.
-> QR code view added to Participant Home to cover virtual check-in requirement.
+> Rationale: First build prompt. PLANNING mode. Hero screen: Organizer Live Ops Dashboard.
+> Gemini: AI teammate matchmaking + announcement TL;DR + score variance.
+> QR code on Participant Home covers virtual check-in. CheckinScanner is the wow moment.
+> Cloud Storage for project file uploads. Explicit file names protect Template B regression rule.
+> Updated: adopted status state map, file names, Cloud Storage, CheckinScanner from parallel AI review.
 
 ---
 
@@ -11,12 +13,13 @@ Dockerfile, and port requirements. Do not ask for any of these values — they a
 This application must use:
 - Firebase Auth (Email/Password + Google SSO) for role-based access (participant / judge / organizer)
 - Firestore for all real-time state: check-ins, teams, scores, announcements, leaderboard
-- Gemini API for score variance detection: Gemini reads all judge scores for a team and flags
-  when two judges diverge by more than 15 points — surfacing this as an actionable alert
-  in the Organizer Command Center
+- Gemini API for THREE features:
+    1. AI teammate matchmaking — ranks candidate participants by skills fit, returns one-line reason per match
+    2. Announcement TL;DR — Gemini writes a 1-line summary per broadcast, stored in tldr field
+    3. Score variance detection — flags when two judges diverge >15 points on a team
 - Cloud Run deployment via ./deploy.sh
-- Firebase Cloud Messaging for push notifications on announcements (Tier 2 — fits because
-  the problem explicitly requires broadcast alerts and real-time announcements)
+- Firebase Cloud Messaging for push notifications on critical broadcasts (Tier 2 — broadcast is a literal requirement)
+- Cloud Storage for project submission file uploads (Tier 2 — submissions require files)
 
 Do not use any non-Google backend services. Do NOT use Firebase Hosting.
 
@@ -25,8 +28,15 @@ Do not use any non-Google backend services. Do NOT use Firebase Hosting.
 BUILD: Smart Event Management Platform — "EventPulse"
 
 A real-time, multi-role event coordination platform for hackathons and tech fests.
-Three distinct role-based dashboards. State changes propagate live via Firestore listeners.
-Gemini AI surfaces coordination intelligence that humans cannot track manually.
+Three distinct role-based dashboards. State changes propagate live via Firestore onSnapshot listeners.
+Gemini AI surfaces coordination intelligence across all three actors.
+
+DESIGN LANGUAGE: Dark operations-console aesthetic.
+Background: #0f172a (slate-900). Card: #1e293b. Borders: #334155.
+Accent colors per actor: organizer=amber (#f59e0b), participant=emerald (#10b981), judge=violet (#8b5cf6).
+Typography: Inter (Google Fonts). Cards have subtle gradient borders.
+Live data updates trigger a brief pulse animation when Firestore values change.
+Every screen has real-looking data from first paint. Zero empty states.
 
 FIREBASE CONFIG — RUNTIME DELIVERY (mandatory, do not skip):
 Vite compiles VITE_FIREBASE_* at build time. Firebase credentials are NOT available at
@@ -34,11 +44,11 @@ Docker build time on Cloud Run. Every VITE_FIREBASE_* variable becomes undefined
 
 THE ONLY CORRECT PATTERN:
 1. Express server reads Firebase env vars from process.env at startup
-2. Expose GET /api/config → returns Firebase config as JSON
+2. Expose GET /api/config — returns Firebase config as JSON
 3. React app fetches /api/config on first load, calls initializeApp() with result
 4. NEVER use import.meta.env.VITE_FIREBASE_* anywhere in the codebase
 
-Example server.js endpoint:
+server.js endpoint:
 app.get('/api/config', (req, res) => {
   res.json({
     apiKey: process.env.FIREBASE_API_KEY,
@@ -50,7 +60,7 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-Example firebase.ts:
+firebase.ts:
 export async function initFirebase() {
   const config = await fetch('/api/config').then(r => r.json());
   const app = initializeApp(config);
@@ -62,42 +72,45 @@ export async function initFirebase() {
 FIRESTORE SCHEMA — implement all collections exactly as specified:
 
 /events/{eventId}
-  name: string           // "AbhiyantriX TechFest 2026"
-  date: timestamp        // 2026-08-29
-  currentRound: string   // "Round 2"
-  roundDeadline: timestamp
-  status: string         // ROUND ACTIVE | SCORING IN PROGRESS | LEADERBOARD LIVE
+  name: string             // "AbhiyantriX TechFest 2026"
+  date: timestamp
+  currentRound: string     // "Round 2"
+  submissionDeadline: timestamp
+  checkinCloses: timestamp
+  judgingCutoff: timestamp
+  status: string           // ROUND_ACTIVE | SCORING_IN_PROGRESS | LEADERBOARD_LIVE
 
 /participants/{userId}
-  name: string           // "Aanya Sharma"
+  name: string             // "Aanya Sharma"
   email: string
-  skills: string[]       // ["React", "ML", "UI Design"]
-  role: string           // "Frontend Developer"
+  skills: string[]         // ["React", "ML", "UI Design"]
+  role: string             // "Frontend Developer"
   teamId: string | null
-  checkInStatus: string  // CHECKED IN | NOT CHECKED IN | LATE ARRIVAL
-  checkInTime: timestamp | null
+  status: string           // REGISTERED | CHECKED_IN | NO_SHOW | LATE_ARRIVAL
+  checkedInAt: timestamp | null
+  registrationCode: string // unique code for CheckinScanner
 
 /teams/{teamId}
-  name: string           // "Team Orion"
-  members: string[]      // [userId, userId, ...]
-  status: string         // TEAM COMPLETE | PENDING MEMBER | TEAM LOCKED
+  name: string             // "Team Orion"
+  memberIds: string[]
+  status: string           // SOLO | TEAM_FORMING | TEAM_CONFIRMED | UNTEAMED
   projectLink: string | null
-  submissionStatus: string  // SUBMISSION OPEN | MISSED SUBMISSION | DISQUALIFIED
+  submissionStatus: string // DRAFT | SUBMITTED | UNDER_REVIEW | SCORED | LATE_SUBMISSION
 
 /judges/{userId}
-  name: string           // "Prof. Meera Pillai"
-  assignedTeams: string[]  // [teamId, ...]
+  name: string
+  assignedTeams: string[]
   scoredTeams: string[]
-  status: string         // EVALUATION COMPLETE | JUDGE OVERDUE
+  status: string           // EVALUATION_COMPLETE | JUDGE_OVERDUE
 
 /scores/{scoreId}
   teamId: string
   judgeId: string
   criteria: {
-    functionality: number   // 0-25
-    innovation: number      // 0-25
-    presentation: number    // 0-25
-    implementation: number  // 0-25
+    functionality: number  // 0-25
+    innovation: number     // 0-25
+    presentation: number   // 0-25
+    implementation: number // 0-25
   }
   total: number
   feedback: string
@@ -106,127 +119,156 @@ FIRESTORE SCHEMA — implement all collections exactly as specified:
 /announcements/{announcementId}
   title: string
   body: string
+  severity: string         // NORMAL | CRITICAL
+  status: string           // LIVE | SUPERSEDED
+  tldr: string             // Gemini-generated one-line summary
+  viewership: number       // count of participants who opened it
   sentAt: timestamp
-  sentBy: string   // organizer userId
-  readBy: string[] // [userId, ...]
+  sentBy: string
 
 /leaderboard/{teamId}
   rank: number
   teamName: string
-  totalScore: number     // average across all judges
-  scores: number[]       // one per judge
+  totalScore: number
   published: boolean
 
 ---
 
-SCREENS TO BUILD (build all 4 in Template A):
-
-1. PARTICIPANT HOME (primary screen — build this first)
-Design: Dark background (#0f172a), card-based layout, accent color #6366f1 (indigo)
-Visual priority order (top to bottom):
-  a) Status bar: "CHECKED IN" green chip OR "NOT CHECKED IN" amber chip with "Show QR" button
-  b) MY QR CODE section: display a QR code generated from the participant's userId.
-     Use the qrcode npm package to render the QR inline as an SVG or canvas element.
-     This QR code is scanned by the organizer/volunteer at entry for check-in verification.
-     Show it prominently when check-in status is NOT CHECKED IN — collapsed/small when CHECKED IN.
-     Label: "Show this QR at entry" with the participant's name and event name below it.
-  c) Team card: team name "Team Orion", members list, "TEAM COMPLETE" badge, project link status
-  d) Round card: "ROUND 2 ACTIVE — Submit by 4:00 PM" with live countdown (47:23 remaining)
-  e) Rank card: "#3 of 18 teams — 2.4 pts behind #2" — only shows once leaderboard is published
-  f) Announcements strip: unread count badge, latest announcement title
-  g) "Find Teammates" button — only visible if teamId is null
-
-Populate with pre-seeded participant: Aanya Sharma, CHECKED IN, Team Orion (TEAM COMPLETE),
-Round 2 active, rank #3.
-
-2. ORGANIZER COMMAND CENTER
-Design: Same dark theme, two-column layout on desktop, single column mobile
-Left column:
-  - Live check-in counter: "143 / 200 checked in" with real-time progress bar
-  - Alerts panel: JUDGE OVERDUE (Prof. Meera Pillai — 3 teams unscored, 18 min to deadline),
-    LATE ARRIVAL (Ravi Kumar — has not checked in), MISSED SUBMISSION (Team Nexus)
-  - All alerts are actionable: "Send Reminder" button on each
-Right column:
-  - Judge progress: 3/5 judges EVALUATION COMPLETE, 2 JUDGE OVERDUE with names
-  - Announcement Composer: title + body fields + "Broadcast to All" button
-  - Leaderboard control: "Publish Leaderboard" button (only active when all judges complete)
-
-3. JUDGE DASHBOARD
-Design: Same dark theme, focused single-column layout
-Top: "Your Queue — 4 teams remaining | Deadline: 18 min"
-Queue list: each team card shows team name, project name, "Score Now" button
-EVALUATION COMPLETE items: team name + total score + timestamp, collapsed
-Active score form (appears inline when "Score Now" is tapped):
-  - Rubric sliders: Functionality (0-25), Innovation (0-25), Presentation (0-25), Implementation (0-25)
-  - Running total shown live
-  - Feedback text area
-  - "Submit Score" button — Firestore write on tap, card moves to EVALUATION COMPLETE list
-
-4. LIVE LEADERBOARD
-Design: Gradient header (#6366f1 to #8b5cf6), table/card list below
-Rank | Team Name | Score | Status chip
-Data: Team Orion #1 (88.5), Team Nexus #2 (86.0), Team Pulse #3 (84.5), Team Vertex #4 (81.0)
-Score chips: green for top 3, amber for 4-10, default for rest
-"SCORING IN PROGRESS" banner when leaderboard is not yet published
-"LEADERBOARD LIVE" banner when published
+STATUS STATE MAP (use these exact labels as UI chips — no invented variants):
+  Check-in: REGISTERED | CHECKED_IN | NO_SHOW | LATE_ARRIVAL
+  Team:      SOLO | TEAM_FORMING | TEAM_CONFIRMED | UNTEAMED
+  Submission: DRAFT | SUBMITTED | UNDER_REVIEW | SCORED | LATE_SUBMISSION
+  Judging:   EVALUATION_COMPLETE | JUDGE_OVERDUE | AWAITING_JUDGE | SCORING_AT_RISK
+  Broadcast: LIVE | SUPERSEDED | CRITICAL
+  Event:     ROUND_ACTIVE | SCORING_IN_PROGRESS | LEADERBOARD_LIVE
 
 ---
 
-GEMINI AI FEATURE — SCORE VARIANCE ALERT (visible in Organizer Command Center):
+SCREENS TO BUILD — all 6 in Template A, with these exact file names:
 
-When all judges have scored a team, Gemini reads the scores and generates this analysis:
-Prompt to Gemini: "Judge scores for Team Orion: [87, 65, 90]. Identify if variance is high
-(>15 points between any two judges). If yes, explain which criteria likely caused the gap
-and recommend whether the organizer should request a re-evaluation."
+1. LandingPage.tsx
+   Product name "EventPulse", one-line value prop, three demo credential cards visible on load.
+   No login wall before landing content. Loads in under 3 seconds.
+   Demo credentials visible: participant@demo.com / judge@demo.com / organizer@demo.com (all: demo1234)
 
-Display in organizer view as an AI alert card:
-Gemini AI Score Review — Team Orion
-"Score variance detected: 25 points between Judge B (65) and Judge C (90).
-High divergence in Innovation criterion. Recommend: organizer reviews Judge B's rubric notes
-before publishing leaderboard."
-[Review Scores] button -> opens score detail
+2. ParticipantHome.tsx
+   Visual priority order (top to bottom):
+   (a) Check-in card: participant "Aanya Sharma", status chip CHECKED_IN (emerald),
+       "Checked in 9:14 AM". QR code rendered inline from registrationCode using
+       the qrcode npm package (SVG output). Label: "Show this QR at entry".
+       QR is prominent when REGISTERED/NOT CHECKED IN, collapsed when CHECKED_IN.
+   (b) Submission countdown: "Submission window closes in 01:42:07" ticking live.
+       Project "PulseBoard — AI Event Orchestrator", status chip SUBMITTED.
+   (c) Team card: Team "Neon Otters", members Aanya Sharma + Rahul Verma + Priya Nair,
+       status TEAM_CONFIRMED.
+   (d) Announcement feed: 4 seeded broadcasts each with Gemini TL;DR line beneath title.
+       One CRITICAL (LIVE pulse chip): "Track B moved to Lab 2, floor 3 — effective now."
+       One SUPERSEDED with strikethrough text.
+   (e) "What's next?" action line: "Next: Judging begins 3:30 PM — keep your demo running."
+   (f) "Find Teammates" button — visible only if teamId is null.
 
-This feature is visible without scrolling on the Organizer Command Center.
-Label: "Powered by Gemini AI — detects scoring inconsistencies across judge panels"
+3. FindMyTeam.tsx
+   Profile form (skills, role, interests) for solo participant "Ishita Rao".
+   Gemini-ranked match list: 3 match cards, each showing name, skills, and a
+   Gemini-written one-line reason ("Rohan Kulkarni — strong PyTorch + CI/CD,
+   needs a data person — 92% fit"). Label each card "⚡ Gemini match".
+   Top card has "Invite to team" button that transitions state to TEAM_FORMING.
+   Seed one UNTEAMED example past deadline: "Dev Patel — teamless past 11:00 AM
+   deadline — see walk-in matching desk, Hall B" as the recovery state.
+
+4. LiveOpsDashboard.tsx (Organizer — THE hero screen)
+   (a) Live counters strip updating via Firestore onSnapshot in real time:
+       Checked in 214/260 | Teams formed 48 | Submissions 22 | Judging 14/22.
+       Numbers pulse-animate visibly when Firestore data changes.
+   (b) Alerts feed seeded with:
+       - 2 UNTEAMED alerts ("Ishita Rao — teamless past 11:00 AM deadline")
+       - 1 SCORING_AT_RISK card ("Judging pace: 14/22 scored, cutoff 3:30 PM — behind pace" in red)
+       - 1 NO_SHOW summary ("46 registered not checked in — close window in 23 min")
+       All alerts have "Send Reminder" action buttons.
+   (c) Judge Assignment Queue: 5 rows showing team name, judge, status chip
+       (SCORED / AWAITING_JUDGE / UNDER_REVIEW).
+   (d) Gemini Score Variance alert card (visible without scrolling):
+       "⚡ Gemini AI Score Review — Team Orion: Score variance 25pts between
+       Judge A (65) and Judge B (90). Divergence in Innovation. Review before publish."
+       [Review Scores] button.
+   (e) Check-in sparkline: last 3 hours of check-in timestamps — real chart.
+   Label (amber banner): "⚡ Powered by Gemini AI — detects scoring inconsistencies and flags unteamed participants"
+
+5. AnnouncementCenter.tsx (Organizer)
+   Composer: title, body, severity selector (NORMAL / CRITICAL), "Broadcast to All" button
+   (sends via FCM topic + writes to Firestore with Gemini-generated tldr field).
+   Broadcast history list with viewership: "seen by 187/224".
+   One SUPERSEDED example with strikethrough.
+
+6. CheckinScanner.tsx (Organizer / volunteer)
+   Input field simulating QR code scan entry.
+   Typing a seeded registrationCode instantly:
+   - Flips that participant from REGISTERED to CHECKED_IN in Firestore
+   - Live Ops counter increments in real time without refresh
+   THIS IS THE WOW MOMENT: scan → dashboard number moves.
+   Show a participant lookup card when code is entered: name, photo-placeholder,
+   skills, team status. Green confirmation flash on success.
 
 ---
 
-SEED DATA FUNCTION (auto-runs on first load — mandatory):
+GEMINI FEATURES (all three visibly active — not chatbots):
 
-Implement seedDatabase() that:
-1. Checks if /participants collection is empty
-2. If empty, writes ALL of this data:
+Feature 1 — TEAMMATE MATCHMAKING (FindMyTeam.tsx):
+Call GET /api/gemini-match with participant skills + candidate pool from Firestore.
+Server calls Gemini: "Rank these candidates for a participant who wants [skills].
+Return top 3 with a one-line reason each."
+Display ranked cards with "⚡ Gemini match" label.
 
-Participants (6):
-  - Aanya Sharma | aanya@example.com | Skills: React, ML, UI Design | CHECKED IN | Team Orion
-  - Rahul Verma | rahul@example.com | Skills: Node.js, Python | CHECKED IN | Team Orion
-  - Priya Nair | priya@example.com | Skills: Flutter, Firebase | NOT CHECKED IN | Team Nexus
-  - Karan Mehta | karan@example.com | Skills: DevOps, Cloud | CHECKED IN | Team Nexus
-  - Sneha Joshi | sneha@example.com | Skills: ML, Data Science | CHECKED IN | null (no team)
-  - Dev Patel | dev@example.com | Skills: UI/UX, Figma | LATE ARRIVAL | null (no team)
+Feature 2 — ANNOUNCEMENT TL;DR (AnnouncementCenter.tsx + ParticipantHome.tsx):
+When organizer broadcasts, server calls Gemini: "Summarize in one line: [announcement body]"
+Store result in tldr field. ParticipantHome shows tldr beneath each announcement title.
+
+Feature 3 — SCORE VARIANCE ALERT (LiveOpsDashboard.tsx):
+When judge scores are submitted, server calls Gemini: "Judge scores for [team]: [scores].
+Flag variance >15pts, identify likely criterion, recommend review."
+Display as AI alert card in Organizer view.
+
+---
+
+SEED DATA FUNCTION (auto-runs on startup — mandatory):
+
+seedDatabase() checks if /participants is empty. If empty, writes:
+
+Participants (8):
+  - Aanya Sharma | CHECKED_IN | Team Orion | registrationCode: "EVT-001"
+  - Rahul Verma | CHECKED_IN | Team Orion | registrationCode: "EVT-002"
+  - Priya Nair | NO_SHOW | Team Nexus | registrationCode: "EVT-003"
+  - Karan Mehta | CHECKED_IN | Team Nexus | registrationCode: "EVT-004"
+  - Ishita Rao | CHECKED_IN | no team (SOLO) | registrationCode: "EVT-005"
+  - Dev Patel | LATE_ARRIVAL | no team (UNTEAMED — past deadline) | registrationCode: "EVT-006"
+  - Rohan Kulkarni | CHECKED_IN | Team Pulse | registrationCode: "EVT-007"
+  - Sneha Iyer | CHECKED_IN | Team Pulse | registrationCode: "EVT-008"
 
 Teams (4):
-  - Team Orion | members: [Aanya, Rahul] | TEAM COMPLETE | projectLink: "github.com/orion/hackproject"
-  - Team Nexus | members: [Priya, Karan] | PENDING MEMBER (Priya not checked in)
-  - Team Pulse | members: [3 members] | TEAM COMPLETE
-  - Team Vertex | members: [2 members] | TEAM LOCKED
+  - Team Orion | TEAM_CONFIRMED | submissionStatus: SUBMITTED | projectLink: "github.com/orion/hackproject"
+  - Team Nexus | TEAM_FORMING (Priya NO_SHOW) | submissionStatus: DRAFT
+  - Team Pulse | TEAM_CONFIRMED | submissionStatus: UNDER_REVIEW
+  - Team Vertex | TEAM_CONFIRMED | submissionStatus: SCORED
 
 Judges (3):
-  - Prof. Meera Pillai | assignedTeams: [Orion, Nexus, Pulse] | JUDGE OVERDUE (1 remaining)
-  - Dr. Arjun Rao | assignedTeams: [Pulse, Vertex] | EVALUATION COMPLETE
-  - Ms. Kavita Singh | assignedTeams: [Orion, Nexus] | EVALUATION COMPLETE
+  - Prof. Meera Pillai | JUDGE_OVERDUE | assignedTeams: [Orion, Nexus, Pulse] | scoredTeams: [Nexus]
+  - Dr. Arjun Rao | EVALUATION_COMPLETE | assignedTeams: [Pulse, Vertex] | scoredTeams: [Pulse, Vertex]
+  - Ms. Kavita Singh | EVALUATION_COMPLETE | assignedTeams: [Orion] | scoredTeams: [Orion]
 
-Scores (4 already submitted):
+Scores (4 submitted):
   - Team Orion / Prof. Meera: functionality:22, innovation:20, presentation:21, implementation:24 | total:87
-  - Team Orion / Dr. Arjun: functionality:18, innovation:15, presentation:16, implementation:16 | total:65
+  - Team Orion / Dr. Arjun: functionality:18, innovation:15, presentation:16, implementation:16 | total:65 (variance trigger)
   - Team Nexus / Ms. Kavita: functionality:21, innovation:22, presentation:20, implementation:23 | total:86
   - Team Pulse / Dr. Arjun: functionality:19, innovation:21, presentation:20, implementation:24 | total:84
 
-Announcements (2):
-  - "Round 2 Now Open" | "Judging begins at 3:30 PM. All teams must submit project links before 4:00 PM." | 14:05
-  - "Venue Change: Final presentations in Seminar Hall B" | 13:50
+Announcements (4):
+  - "Round 2 Now Open" | NORMAL | LIVE | tldr: "Judging starts 3:30 PM, submit by 4:00 PM."
+  - "Track B moved to Lab 2, floor 3" | CRITICAL | LIVE | tldr: "Track B is now in Lab 2, 3rd floor."
+  - "Lunch break extended by 20 min" | NORMAL | SUPERSEDED | tldr: "Lunch now ends at 1:20 PM."
+  - "Final presentations in Seminar Hall B" | NORMAL | LIVE | tldr: "Finals moved to Seminar Hall B."
 
-3. seedDatabase() is called automatically on app startup — not triggered by a button
+Check-in timestamps: spread across last 3 hours so sparkline is real (not flat).
+Every status in STATUS STATE MAP must have at least one visible example.
 
 ---
 
@@ -260,46 +302,37 @@ RUN npm ci --only=production
 EXPOSE 8080
 CMD ["node", "server.js"]
 
-Express server must listen on process.env.PORT (not hardcoded 3000 or 8080).
+Express server listens on process.env.PORT — never hardcode 3000 or 8080.
 
 ---
 
 TECH STACK:
 - Frontend: React + Vite + TypeScript
 - Styling: Tailwind CSS
-- Backend: Express.js (serves React app + /api/config + /api/gemini-analysis)
-- Database: Firestore (real-time listeners on all live data)
-- Auth: Firebase Auth with role claim in Firestore /users/{uid}.role
-- AI: Gemini API (gemini-1.5-pro) for score variance analysis
-
----
-
-VISUAL DESIGN REQUIREMENTS:
-- Dark theme: background #0f172a, card background #1e293b, borders #334155
-- Accent: #6366f1 indigo — buttons, active states, progress bars
-- Status chips: CHECKED IN -> green (#22c55e), NOT CHECKED IN -> amber (#f59e0b),
-  LATE ARRIVAL -> red (#ef4444), TEAM COMPLETE -> green, PENDING MEMBER -> amber,
-  JUDGE OVERDUE -> red, EVALUATION COMPLETE -> green
-- Typography: Inter font (Google Fonts)
-- All cards have subtle gradient borders
-- Live data updates with a brief pulse animation (ring-pulse) when values change
+- Backend: Express.js (serves React + /api/config + /api/gemini-match + /api/gemini-analysis)
+- Database: Firestore with onSnapshot real-time listeners
+- Auth: Firebase Auth, role stored in Firestore /users/{uid}.role
+- AI: Gemini API (gemini-1.5-pro)
+- Storage: Firebase Cloud Storage (project file uploads)
+- Notifications: Firebase Cloud Messaging (broadcast announcements)
 
 ---
 
 NO DEMO MODE RULE:
-If Firebase config fails or any credential is missing, DO NOT fall back to hardcoded
-demo data, static mockups, or bypassed auth. The fix is always: implement the
-/api/config runtime delivery pattern correctly. Never work around it.
+If Firebase config fails, fix /api/config runtime delivery — never fall back to
+hardcoded mock data, static mockups, or bypassed auth. Demo mode scores zero.
 
 ---
 
 Before finishing, verify:
-[] Run the app locally — confirm landing screen shows real data, not a blank page
+[] Run app locally — landing screen shows real data, not a blank page
 [] If blank: check Firestore rules allow unauthenticated reads AND seedDatabase() ran
-[] No login wall on load — app opens directly to Participant Home (role switcher in top nav)
-[] Core interaction completes in under 30 seconds (check-in -> team view -> round status)
-[] Gemini score variance alert is visibly active on the Organizer Command Center
-[] QR code renders on Participant Home from participant userId — not a placeholder image
-[] Real data on every screen — no placeholder text anywhere
-[] Status chips match the Status State Map exactly
+[] No login wall on load — opens directly to LandingPage with demo credentials visible
+[] Core wow moment works: type registrationCode in CheckinScanner → Live Ops counter ticks live
+[] Gemini teammate matches visible on FindMyTeam with "⚡ Gemini match" label
+[] Gemini TL;DR visible beneath each announcement on ParticipantHome
+[] Gemini score variance alert card visible on LiveOpsDashboard without scrolling
+[] QR code renders on ParticipantHome from registrationCode — not a placeholder
+[] Every STATUS STATE MAP status has at least one visible seeded example
+[] Status chips use exact STATUS STATE MAP labels — zero invented variants
 [] Dockerfile present, server uses process.env.PORT, firestore.rules file exists
