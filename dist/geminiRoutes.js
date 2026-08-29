@@ -21,7 +21,7 @@ Respond ONLY with the summary.`;
     res.json({ summary });
   } catch (err) {
     console.error('Gemini judge summary error:', err.message);
-    res.status(500).json({ error: '⚠ Gemini unavailable — retry' });
+    res.json({ summary: 'Gemini consensus unavailable — check original feedback.' });
   }
 });
 

@@ -176,7 +176,7 @@ export default function ParticipantHome() {
             {/* QR — prominent when REGISTERED, collapsed when CHECKED_IN */}
             {!checkedIn && qrDataUrl && (
               <div className="flex flex-col items-center mt-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700">
-                <img src={qrDataUrl} alt="Check-in QR code" className="w-40 h-40 rounded-lg" />
+                <img src={qrDataUrl} alt="Participant unique QR code for check-in" className="w-40 h-40 rounded-lg" />
                 <p className="text-xs text-slate-400 mt-2">Show this QR at entry</p>
                 <p className="text-xs font-mono text-slate-500">{participant?.registrationCode}</p>
               </div>
@@ -188,7 +188,7 @@ export default function ParticipantHome() {
                 </summary>
                 {qrDataUrl && (
                   <div className="flex justify-center mt-2">
-                    <img src={qrDataUrl} alt="QR" className="w-24 h-24 opacity-50 rounded" />
+                    <img src={qrDataUrl} alt="Participant unique QR code for check-in" className="w-24 h-24 opacity-50 rounded" />
                   </div>
                 )}
               </details>

@@ -27,6 +27,10 @@ export default function FindMyTeam() {
   const [skills, setSkills] = useState('React, Figma, CSS');
   const [role, setRole] = useState('UI/UX Designer');
   const [interests, setInterests] = useState('AI/ML tools, Productivity apps');
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [invitedId, setInvitedId] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function runGeminiMatch() {

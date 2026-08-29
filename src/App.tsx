@@ -15,19 +15,21 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppNav />
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/participant" element={<ParticipantHome />} />
-        <Route path="/find-team" element={<FindMyTeam />} />
-        <Route path="/live-ops" element={<LiveOpsDashboard />} />
-        <Route path="/announcements" element={<AnnouncementCenter />} />
-        <Route path="/checkin" element={<CheckinScanner />} />
-        <Route path="/judge" element={<JudgeQueue />} />
-        <Route path="/submit" element={<SubmissionUpload />} />
-        <Route path="/leaderboard" element={<LeaderboardView />} />
-        <Route path="/assignments" element={<JudgeAssignment />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <main role="main" className="w-full min-h-screen">
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/participant" element={<ParticipantHome />} />
+          <Route path="/find-team" element={<FindMyTeam />} />
+          <Route path="/live-ops" element={<LiveOpsDashboard />} />
+          <Route path="/announcements" element={<AnnouncementCenter />} />
+          <Route path="/checkin" element={<CheckinScanner />} />
+          <Route path="/judge" element={<JudgeQueue />} />
+          <Route path="/submit" element={<SubmissionUpload />} />
+          <Route path="/leaderboard" element={<LeaderboardView />} />
+          <Route path="/assignments" element={<JudgeAssignment />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </BrowserRouter>
   );
 }
