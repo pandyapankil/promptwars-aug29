@@ -12,14 +12,36 @@ let _db: Firestore | null = null;
 let _storage: FirebaseStorage | null = null;
 let _initPromise: Promise<void> | null = null;
 
+const FALLBACK_CONFIG = {
+  apiKey: "AIzaSyAmmvliUGEwfELxNLRiLmtdh6u0XrvrbDE",
+  authDomain: "promptwars-aug29.firebaseapp.com",
+  projectId: "promptwars-aug29",
+  storageBucket: "promptwars-aug29.firebasestorage.app",
+  messagingSenderId: "913258105665",
+  appId: "1:913258105665:web:a6d323eee3151089102fc0",
+};
+
 export async function initFirebase(): Promise<void> {
   if (_initPromise) return _initPromise;
   _initPromise = (async () => {
-    const config = await fetch('/api/config').then(r => r.json());
-    _app = initializeApp(config);
-    _auth = getAuth(_app);
-    _db = getFirestore(_app);
-    _storage = getStorage(_app);
+    let config = FALLBACK_CONFIG;
+    try {
+      const res = await fetch('/api/config');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.apiKey) config = json;
+      }
+    } catch (e) {
+      console.warn('Could not fetch /api/config, using config defaults:', e);
+    }
+    try {
+      _app = initializeApp(config);
+      _auth = getAuth(_app);
+      _db = getFirestore(_app);
+      _storage = getStorage(_app);
+    } catch (e) {
+      console.error('Firebase initializeApp error:', e);
+    }
   })();
   return _initPromise;
 }

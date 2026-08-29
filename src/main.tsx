@@ -7,12 +7,14 @@ import './index.css';
 
 async function bootstrap() {
   await initFirebase();
-  await seedDatabase(); // Auto-seeds if collection empty
+  // Mount React immediately — don't block on seed
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
+  // Seed in background — permission errors are non-fatal
+  seedDatabase().catch(err => console.warn('Seed skipped (may already be seeded):', err.message));
 }
 
 bootstrap().catch(console.error);

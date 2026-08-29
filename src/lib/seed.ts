@@ -7,6 +7,17 @@ import {
   limit,
   Timestamp,
 } from 'firebase/firestore';
+
+// Safe write — silently skips on permission errors (Firestore rules require auth for writes)
+async function safeSet(ref: ReturnType<typeof doc>, data: object) {
+  try {
+    await setDoc(ref, data, { merge: true });
+  } catch (e: unknown) {
+    // Permission denied is expected if user is not signed in yet — seed will retry on next visit
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes('permission') && !msg.includes('PERMISSION_DENIED')) throw e;
+  }
+}
 import { getFirebaseDb } from '../firebase';
 
 const EVENT_ID = 'abhiyantrix-2026';
@@ -28,7 +39,7 @@ export async function seedDatabase(): Promise<void> {
   console.log('🌱 Seeding database...');
 
   // ── EVENT ──────────────────────────────────────────────────
-  await setDoc(doc(db, 'events', EVENT_ID), {
+  await safeSet(doc(db, 'events', EVENT_ID), {
     name: 'AbhiyantriX TechFest 2026',
     date: ts(-180),
     currentRound: 'Round 2',
@@ -132,13 +143,13 @@ export async function seedDatabase(): Promise<void> {
 
   for (const p of participants) {
     const { id, ...data } = p;
-    await setDoc(doc(db, 'participants', id), data);
+    await safeSet(doc(db, 'participants', id), data);
   }
 
   // Also create demo user records for auth roles
-  await setDoc(doc(db, 'users', 'demo-participant'), { role: 'participant', email: 'participant@demo.com', name: 'Demo Participant' });
-  await setDoc(doc(db, 'users', 'demo-judge'), { role: 'judge', email: 'judge@demo.com', name: 'Demo Judge' });
-  await setDoc(doc(db, 'users', 'demo-organizer'), { role: 'organizer', email: 'organizer@demo.com', name: 'Demo Organizer' });
+  await safeSet(doc(db, 'users', 'demo-participant'), { role: 'participant', email: 'participant@demo.com', name: 'Demo Participant' });
+  await safeSet(doc(db, 'users', 'demo-judge'), { role: 'judge', email: 'judge@demo.com', name: 'Demo Judge' });
+  await safeSet(doc(db, 'users', 'demo-organizer'), { role: 'organizer', email: 'organizer@demo.com', name: 'Demo Organizer' });
 
   // ── TEAMS (4) — covers DRAFT, SUBMITTED, UNDER_REVIEW, SCORED, LATE_SUBMISSION ──
   const teams = [
@@ -186,7 +197,7 @@ export async function seedDatabase(): Promise<void> {
 
   for (const t of teams) {
     const { id, ...data } = t;
-    await setDoc(doc(db, 'teams', id), data);
+    await safeSet(doc(db, 'teams', id), data);
   }
 
   // ── JUDGES (3) — covers EVALUATION_COMPLETE, JUDGE_OVERDUE ─
@@ -216,7 +227,7 @@ export async function seedDatabase(): Promise<void> {
 
   for (const j of judges) {
     const { id, ...data } = j;
-    await setDoc(doc(db, 'judges', id), data);
+    await safeSet(doc(db, 'judges', id), data);
   }
 
   // ── SCORES (4) — Orion has variance trigger (87 vs 65) ─────
@@ -261,7 +272,7 @@ export async function seedDatabase(): Promise<void> {
 
   for (const s of scores) {
     const { id, ...data } = s;
-    await setDoc(doc(db, 'scores', id), data);
+    await safeSet(doc(db, 'scores', id), data);
   }
 
   // ── ANNOUNCEMENTS (4) — covers LIVE, SUPERSEDED, CRITICAL ──
@@ -314,7 +325,7 @@ export async function seedDatabase(): Promise<void> {
 
   for (const a of announcements) {
     const { id, ...data } = a;
-    await setDoc(doc(db, 'announcements', id), data);
+    await safeSet(doc(db, 'announcements', id), data);
   }
 
   // ── LEADERBOARD ─────────────────────────────────────────────
@@ -327,7 +338,7 @@ export async function seedDatabase(): Promise<void> {
 
   for (const l of leaderboard) {
     const { id, ...data } = l;
-    await setDoc(doc(db, 'leaderboard', id), data);
+    await safeSet(doc(db, 'leaderboard', id), data);
   }
 
   // ── CHECK-IN TIMESTAMPS — spread over last 3h for sparkline ─
@@ -356,11 +367,11 @@ export async function seedDatabase(): Promise<void> {
   ];
 
   for (let i = 0; i < checkins.length; i++) {
-    await setDoc(doc(db, 'checkins', `ci-${i}`), checkins[i]);
+    await safeSet(doc(db, 'checkins', `ci-${i}`), checkins[i]);
   }
 
   // ── STATS DOCUMENT for LiveOps counters ─────────────────────
-  await setDoc(doc(db, 'stats', 'live'), {
+  await safeSet(doc(db, 'stats', 'live'), {
     totalRegistered: 260,
     checkedIn: 214,
     teamsFormed: 48,

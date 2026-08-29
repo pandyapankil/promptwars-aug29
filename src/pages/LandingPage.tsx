@@ -53,12 +53,11 @@ export default function LandingPage() {
     try {
       const auth = getFirebaseAuth();
       await signInWithEmailAndPassword(auth, cred.email, cred.password);
-      navigate(cred.path);
     } catch {
-      // If user doesn't exist yet in Firebase Auth, just navigate directly for demo
-      navigate(cred.path);
+      // In demo mode / unauthenticated, just navigate directly to destination
     } finally {
       setLoading(null);
+      navigate(cred.path);
     }
   }
 

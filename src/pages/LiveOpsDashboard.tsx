@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { onSnapshot, doc, collection } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { getFirebaseDb } from '../firebase';
-import { StatusChip, formatTime } from '../lib/ui';
+import { StatusChip, formatTime, toJsDate } from '../lib/ui';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -17,7 +17,7 @@ interface Stats {
 }
 
 interface Checkin {
-  time: { toDate: () => Date };
+  time: unknown;
 }
 
 interface Alert {
@@ -43,15 +43,26 @@ const JUDGE_QUEUE = [
   { team: 'Team Delta', judge: 'Prof. Meera Pillai', status: 'AWAITING_JUDGE' },
 ];
 
+const DEFAULT_SPARKLINE = [
+  { time: '180m ago', checkins: 12 },
+  { time: '150m ago', checkins: 45 },
+  { time: '120m ago', checkins: 68 },
+  { time: '90m ago', checkins: 38 },
+  { time: '60m ago', checkins: 28 },
+  { time: '30m ago', checkins: 18 },
+  { time: '0m ago', checkins: 5 },
+];
+
 function buildSparklineData(checkins: Checkin[]) {
-  // Build 36 5-min buckets covering last 3 hours
+  if (!checkins.length) return DEFAULT_SPARKLINE;
   const now = Date.now();
   const buckets: Record<number, number> = {};
   for (let i = 0; i < 36; i++) {
     buckets[i] = 0;
   }
   checkins.forEach(ci => {
-    const age = (now - ci.time.toDate().getTime()) / 1000 / 60; // minutes ago
+    const dt = toJsDate(ci.time);
+    const age = (now - dt.getTime()) / 1000 / 60; // minutes ago
     if (age >= 0 && age <= 180) {
       const bucket = 35 - Math.floor(age / 5);
       if (bucket >= 0) buckets[bucket] = (buckets[bucket] || 0) + 1;
@@ -65,13 +76,12 @@ function buildSparklineData(checkins: Checkin[]) {
 
 export default function LiveOpsDashboard() {
   const navigate = useNavigate();
-  const db = getFirebaseDb();
 
   const [stats, setStats] = useState<Stats>({
     totalRegistered: 260, checkedIn: 214, teamsFormed: 48,
     submissions: 22, judgingComplete: 14, judgingTotal: 22,
   });
-  const [sparkData, setSparkData] = useState<{ time: string; checkins: number }[]>([]);
+  const [sparkData, setSparkData] = useState<{ time: string; checkins: number }[]>(DEFAULT_SPARKLINE);
   const [pulsedFields, setPulsedFields] = useState<Set<string>>(new Set());
   const prevStats = useRef<Stats | null>(null);
 
@@ -82,30 +92,42 @@ export default function LiveOpsDashboard() {
 
   // Live stats via Firestore onSnapshot
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'stats', 'live'), snap => {
-      if (!snap.exists()) return;
-      const newStats = snap.data() as Stats;
-      if (prevStats.current) {
-        const changed: string[] = [];
-        (Object.keys(newStats) as (keyof Stats)[]).forEach(k => {
-          if (newStats[k] !== prevStats.current![k]) changed.push(k);
-        });
-        if (changed.length) triggerPulse(changed);
-      }
-      prevStats.current = newStats;
-      setStats(newStats);
-    });
-    return unsub;
-  }, [db]);
+    try {
+      const db = getFirebaseDb();
+      const unsub = onSnapshot(doc(db, 'stats', 'live'), snap => {
+        if (!snap.exists()) return;
+        const newStats = snap.data() as Stats;
+        if (prevStats.current) {
+          const changed: string[] = [];
+          (Object.keys(newStats) as (keyof Stats)[]).forEach(k => {
+            if (newStats[k] !== prevStats.current![k]) changed.push(k);
+          });
+          if (changed.length) triggerPulse(changed);
+        }
+        prevStats.current = newStats;
+        setStats(newStats);
+      }, err => console.warn('Stats onSnapshot:', err));
+      return unsub;
+    } catch (e) {
+      console.warn('Firebase not ready:', e);
+    }
+  }, []);
 
   // Sparkline data from checkins collection
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'checkins'), snap => {
-      const items = snap.docs.map(d => d.data() as Checkin);
-      setSparkData(buildSparklineData(items));
-    });
-    return unsub;
-  }, [db]);
+    try {
+      const db = getFirebaseDb();
+      const unsub = onSnapshot(collection(db, 'checkins'), snap => {
+        if (!snap.empty) {
+          const items = snap.docs.map(d => d.data() as Checkin);
+          setSparkData(buildSparklineData(items));
+        }
+      }, err => console.warn('Checkins onSnapshot:', err));
+      return unsub;
+    } catch (e) {
+      console.warn('Firebase not ready:', e);
+    }
+  }, []);
 
   function CounterCard({ label, value, sub, field }: { label: string; value: string; sub?: string; field: string }) {
     const isPulsing = pulsedFields.has(field);

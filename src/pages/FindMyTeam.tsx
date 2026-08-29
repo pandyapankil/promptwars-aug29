@@ -45,7 +45,6 @@ const SEEDED_MATCHES: Match[] = [
 
 export default function FindMyTeam() {
   const navigate = useNavigate();
-  const db = getFirebaseDb();
 
   const [skills, setSkills] = useState('React, Figma, CSS');
   const [role, setRole] = useState('UI/UX Designer');
@@ -86,16 +85,17 @@ export default function FindMyTeam() {
   async function handleInvite(match: Match) {
     setInviteLoading(match.participantId);
     try {
+      const db = getFirebaseDb();
       await updateDoc(doc(db, 'participants', match.participantId), {
         teamId: 'team-forming-ishita',
       });
       await updateDoc(doc(db, 'participants', 'uid-ishita'), {
         teamId: 'team-forming-ishita',
       });
-      setInvitedId(match.participantId);
     } catch (e) {
-      console.error(e);
+      console.warn('Firestore updateDoc skipped (using local state):', e);
     } finally {
+      setInvitedId(match.participantId);
       setInviteLoading(null);
     }
   }

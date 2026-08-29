@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, addDoc, onSnapshot, Timestamp, updateDoc, doc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { getFirebaseDb } from '../firebase';
-import { StatusChip, formatTime } from '../lib/ui';
+import { StatusChip, formatTime, toJsDate } from '../lib/ui';
 
 interface Announcement {
   id: string;
@@ -12,28 +12,77 @@ interface Announcement {
   status: string;
   tldr: string;
   viewership: number;
-  sentAt: { toDate: () => Date };
+  sentAt: unknown;
 }
+
+const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: 'ann-track-b',
+    title: 'Track B moved to Lab 2, floor 3',
+    body: 'Effective immediately: all Track B presentations are relocated to Lab 2, 3rd floor.',
+    severity: 'CRITICAL',
+    status: 'LIVE',
+    tldr: 'Track B is now in Lab 2, 3rd floor — effective immediately.',
+    viewership: 214,
+    sentAt: new Date(Date.now() - 95 * 60 * 1000),
+  },
+  {
+    id: 'ann-round2',
+    title: 'Round 2 Now Open',
+    body: 'Round 2 judging has officially started. All submissions must be finalized by 4:00 PM.',
+    severity: 'NORMAL',
+    status: 'LIVE',
+    tldr: 'Judging starts 3:30 PM, submit by 4:00 PM.',
+    viewership: 187,
+    sentAt: new Date(Date.now() - 120 * 60 * 1000),
+  },
+  {
+    id: 'ann-finals',
+    title: 'Final presentations in Seminar Hall B',
+    body: 'All final presentations will take place in Seminar Hall B.',
+    severity: 'NORMAL',
+    status: 'LIVE',
+    tldr: 'Finals moved to Seminar Hall B — doors open 5:45 PM.',
+    viewership: 156,
+    sentAt: new Date(Date.now() - 60 * 60 * 1000),
+  },
+  {
+    id: 'ann-lunch',
+    title: 'Lunch break extended by 20 min',
+    body: 'Lunch break has been extended by 20 minutes.',
+    severity: 'NORMAL',
+    status: 'SUPERSEDED',
+    tldr: 'Lunch now ends at 1:20 PM.',
+    viewership: 198,
+    sentAt: new Date(Date.now() - 180 * 60 * 1000),
+  },
+];
 
 export default function AnnouncementCenter() {
   const navigate = useNavigate();
-  const db = getFirebaseDb();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [severity, setSeverity] = useState<'NORMAL' | 'CRITICAL'>('NORMAL');
   const [broadcasting, setBroadcasting] = useState(false);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(DEFAULT_ANNOUNCEMENTS);
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'announcements'), snap => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
-      items.sort((a, b) => b.sentAt.toDate().getTime() - a.sentAt.toDate().getTime());
-      setAnnouncements(items);
-    });
-    return unsub;
-  }, [db]);
+    try {
+      const db = getFirebaseDb();
+      const unsub = onSnapshot(collection(db, 'announcements'), snap => {
+        if (!snap.empty) {
+          const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+          items.sort((a, b) => toJsDate(b.sentAt).getTime() - toJsDate(a.sentAt).getTime());
+          setAnnouncements(items);
+        }
+      }, err => console.warn('Announcements onSnapshot:', err));
+      return unsub;
+    } catch (e) {
+      console.warn('Firebase not ready:', e);
+    }
+  }, []);
 
   async function handleBroadcast() {
     if (!title.trim() || !body.trim()) return;
@@ -58,16 +107,21 @@ export default function AnnouncementCenter() {
       }
 
       // 2. Write to Firestore
-      await addDoc(collection(db, 'announcements'), {
-        title,
-        body,
-        severity,
-        status: 'LIVE',
-        tldr,
-        viewership: 0,
-        sentAt: Timestamp.now(),
-        sentBy: 'organizer@demo.com',
-      });
+      try {
+        const db = getFirebaseDb();
+        await addDoc(collection(db, 'announcements'), {
+          title,
+          body,
+          severity,
+          status: 'LIVE',
+          tldr,
+          viewership: 0,
+          sentAt: Timestamp.now(),
+          sentBy: 'organizer@demo.com',
+        });
+      } catch (dbErr) {
+        console.warn('Firestore addDoc skipped:', dbErr);
+      }
 
       // 3. FCM broadcast via server
       try {
@@ -90,6 +144,7 @@ export default function AnnouncementCenter() {
 
   async function handleSupersede(id: string) {
     try {
+      const db = getFirebaseDb();
       await updateDoc(doc(db, 'announcements', id), { status: 'SUPERSEDED' });
     } catch (e) { console.error(e); }
   }
@@ -208,7 +263,7 @@ export default function AnnouncementCenter() {
                     <div className="flex items-center gap-3 text-xs text-slate-600">
                       <span>👁 seen by <span className="text-slate-400">{ann.viewership}</span> participants</span>
                       <span>·</span>
-                      <span>{formatTime(ann.sentAt.toDate())}</span>
+                      <span>{formatTime(ann.sentAt)}</span>
                     </div>
                   </div>
                   {ann.status === 'LIVE' && (

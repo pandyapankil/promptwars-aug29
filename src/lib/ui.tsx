@@ -44,6 +44,23 @@ export function StatusChip({ status }: { status: string }) {
   );
 }
 
+export function toJsDate(val: unknown): Date {
+  if (!val) return new Date();
+  if (typeof (val as { toDate?: () => Date }).toDate === 'function') {
+    try {
+      return (val as { toDate: () => Date }).toDate();
+    } catch {
+      return new Date();
+    }
+  }
+  if (val instanceof Date) return val;
+  if (typeof val === 'string' || typeof val === 'number') {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
 export function formatCountdown(ms: number): string {
   if (ms <= 0) return '00:00:00';
   const totalSeconds = Math.floor(ms / 1000);
@@ -53,7 +70,8 @@ export function formatCountdown(ms: number): string {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
 }
 
-export function timeAgo(date: Date): string {
+export function timeAgo(val: unknown): string {
+  const date = toJsDate(val);
   const mins = Math.floor((Date.now() - date.getTime()) / 60000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
@@ -62,6 +80,7 @@ export function timeAgo(date: Date): string {
   return date.toLocaleDateString();
 }
 
-export function formatTime(date: Date): string {
+export function formatTime(val: unknown): string {
+  const date = toJsDate(val);
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { StatusChip, formatCountdown, formatTime } from '../lib/ui';
+import { StatusChip, formatCountdown, formatTime, toJsDate } from '../lib/ui';
 import QRCode from 'qrcode';
 
 interface Participant {
@@ -11,27 +11,75 @@ interface Participant {
   teamId: string | null;
   skills: string[];
   registrationCode: string;
-  checkedInAt: { toDate: () => Date } | null;
+  checkedInAt: unknown;
 }
 
 interface Announcement {
   id: string;
   title: string;
+  body?: string;
   tldr: string;
   severity: string;
   status: string;
-  sentAt: { toDate: () => Date };
+  sentAt: unknown;
 }
+
+const DEFAULT_PARTICIPANT: Participant = {
+  name: 'Aanya Sharma',
+  status: 'CHECKED_IN',
+  teamId: 'team-orion',
+  skills: ['React', 'TypeScript', 'UI Design'],
+  registrationCode: 'EVT-001',
+  checkedInAt: new Date(Date.now() - 167 * 60 * 1000),
+};
+
+const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: 'ann-track-b',
+    title: 'Track B moved to Lab 2, floor 3',
+    body: 'Effective immediately: all Track B presentations are relocated to Lab 2, 3rd floor.',
+    severity: 'CRITICAL',
+    status: 'LIVE',
+    tldr: 'Track B is now in Lab 2, 3rd floor — effective immediately.',
+    sentAt: new Date(Date.now() - 95 * 60 * 1000),
+  },
+  {
+    id: 'ann-round2',
+    title: 'Round 2 Now Open',
+    body: 'Round 2 judging has officially started. Submissions due by 4:00 PM.',
+    severity: 'NORMAL',
+    status: 'LIVE',
+    tldr: 'Judging starts 3:30 PM, submit by 4:00 PM.',
+    sentAt: new Date(Date.now() - 120 * 60 * 1000),
+  },
+  {
+    id: 'ann-finals',
+    title: 'Final presentations in Seminar Hall B',
+    body: 'All final presentations will take place in Seminar Hall B.',
+    severity: 'NORMAL',
+    status: 'LIVE',
+    tldr: 'Finals moved to Seminar Hall B — doors open 5:45 PM.',
+    sentAt: new Date(Date.now() - 60 * 60 * 1000),
+  },
+  {
+    id: 'ann-lunch',
+    title: 'Lunch break extended by 20 min',
+    body: 'Lunch break has been extended by 20 minutes.',
+    severity: 'NORMAL',
+    status: 'SUPERSEDED',
+    tldr: 'Lunch now ends at 1:20 PM.',
+    sentAt: new Date(Date.now() - 180 * 60 * 1000),
+  },
+];
 
 const SUBMISSION_DEADLINE = new Date(Date.now() + 102 * 60 * 1000); // ~1h42m from now
 
 export default function ParticipantHome() {
   const navigate = useNavigate();
-  const db = getFirebaseDb();
 
-  const [participant, setParticipant] = useState<Participant | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [countdown, setCountdown] = useState('');
+  const [participant, setParticipant] = useState<Participant>(DEFAULT_PARTICIPANT);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(DEFAULT_ANNOUNCEMENTS);
+  const [countdown, setCountdown] = useState('01:42:07');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [teamName] = useState('Neon Otters');
   const [teamMembers] = useState(['Aanya Sharma', 'Rahul Verma', 'Priya Nair']);
@@ -48,31 +96,43 @@ export default function ParticipantHome() {
 
   // Load participant data
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'participants', 'uid-aanya'), snap => {
-      if (snap.exists()) setParticipant(snap.data() as Participant);
-    });
-    return unsub;
-  }, [db]);
+    try {
+      const db = getFirebaseDb();
+      const unsub = onSnapshot(doc(db, 'participants', 'uid-aanya'), snap => {
+        if (snap.exists()) setParticipant(snap.data() as Participant);
+      }, err => console.warn('Participant onSnapshot:', err));
+      return unsub;
+    } catch (e) {
+      console.warn('Firebase db not ready:', e);
+    }
+  }, []);
 
   // Generate QR from registrationCode — deterministic per code (Correction 3)
   useEffect(() => {
-    if (!participant?.registrationCode) return;
-    QRCode.toDataURL(participant.registrationCode, {
+    const code = participant.registrationCode || 'EVT-001';
+    QRCode.toDataURL(code, {
       width: 160,
       margin: 1,
       color: { dark: '#ffffff', light: '#1e293b' },
-    }).then(setQrDataUrl);
-  }, [participant?.registrationCode]);
+    }).then(setQrDataUrl).catch(console.error);
+  }, [participant.registrationCode]);
 
   // Announcements feed
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'announcements'), snap => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
-      items.sort((a, b) => b.sentAt.toDate().getTime() - a.sentAt.toDate().getTime());
-      setAnnouncements(items);
-    });
-    return unsub;
-  }, [db]);
+    try {
+      const db = getFirebaseDb();
+      const unsub = onSnapshot(collection(db, 'announcements'), snap => {
+        if (!snap.empty) {
+          const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+          items.sort((a, b) => toJsDate(b.sentAt).getTime() - toJsDate(a.sentAt).getTime());
+          setAnnouncements(items);
+        }
+      }, err => console.warn('Announcements onSnapshot:', err));
+      return unsub;
+    } catch (e) {
+      console.warn('Firebase db not ready:', e);
+    }
+  }, []);
 
   const checkedIn = participant?.status === 'CHECKED_IN';
 
@@ -101,9 +161,9 @@ export default function ParticipantHome() {
                   <span className="text-white font-semibold">{participant?.name ?? 'Aanya Sharma'}</span>
                   <StatusChip status={participant?.status ?? 'CHECKED_IN'} />
                 </div>
-                {checkedIn && participant?.checkedInAt && (
+                {checkedIn && Boolean(participant?.checkedInAt) && (
                   <p className="text-sm text-slate-400">
-                    Checked in {formatTime(participant.checkedInAt.toDate())}
+                    Checked in {formatTime(participant.checkedInAt)}
                   </p>
                 )}
                 {!checkedIn && (
@@ -208,7 +268,7 @@ export default function ParticipantHome() {
                     )}
                   </div>
                   <span className="text-xs text-slate-600 whitespace-nowrap shrink-0">
-                    {formatTime(ann.sentAt.toDate())}
+                    {formatTime(ann.sentAt)}
                   </span>
                 </div>
               </div>
