@@ -62,7 +62,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
+    <main className="min-h-screen bg-slate-900 flex flex-col">
       {/* Nav */}
       <nav className="border-b border-slate-700/50 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -117,6 +117,8 @@ export default function LandingPage() {
               key={cred.role}
               className={`rounded-xl p-5 ${cred.accent} text-left transition-all duration-200 hover:scale-[1.02] cursor-pointer`}
               onClick={() => handleDemo(cred)}
+              role="button"
+              tabIndex={0}
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="text-2xl">{cred.icon}</span>
@@ -166,6 +168,6 @@ export default function LandingPage() {
       <footer className="border-t border-slate-800 px-6 py-4 text-center text-xs text-slate-600">
         EventPulse · Built with Firebase Auth, Firestore, Gemini AI, Cloud Run · AbhiyantriX TechFest 2026
       </footer>
-    </div>
+    </main>
   );
 }

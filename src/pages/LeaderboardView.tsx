@@ -114,7 +114,7 @@ export default function LeaderboardView() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-10">
+    <main className="min-h-screen bg-slate-900 pb-10">
       <nav className="border-b border-slate-700/50 px-4 md:px-6 py-3 flex items-center justify-between">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
           <span className="text-amber-400 font-bold text-sm">EP</span>
@@ -144,11 +144,11 @@ export default function LeaderboardView() {
             <p className="text-xs text-slate-400">Top 10 teams. Ties broken by submission time.</p>
           </div>
           
-          <div className="divide-y divide-slate-700/30">
+          <ol aria-live="polite" aria-label="Live leaderboard rankings" className="divide-y divide-slate-700/30">
             {displayEntries.map(entry => {
               const isPulsing = pulsingRanks.has(entry.teamId);
               return (
-                <div key={entry.teamId} className={`p-4 flex items-center justify-between transition-all ${isPulsing ? 'bg-amber-500/10 pulse-update' : 'hover:bg-slate-800/50'}`}>
+                <li key={entry.teamId} className={`p-4 flex items-center justify-between transition-all ${isPulsing ? 'bg-amber-500/10 pulse-update' : 'hover:bg-slate-800/50'}`}>
                   <div className="flex items-center gap-4">
                     <div className={`w-8 text-center font-mono font-bold text-lg ${entry.rank! <= 3 ? 'text-amber-400' : 'text-slate-500'}`}>
                       #{entry.rank}
@@ -164,12 +164,12 @@ export default function LeaderboardView() {
                     <div className="text-2xl font-mono font-bold text-white">{entry.score.toFixed(1)}</div>
                     <div className="text-[10px] text-slate-500 uppercase tracking-wider">Points</div>
                   </div>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ol>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -125,7 +125,7 @@ export default function JudgeQueue() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-10">
+    <main className="min-h-screen bg-slate-900 pb-10">
       <nav className="border-b border-slate-700/50 px-4 md:px-6 py-3 flex items-center justify-between">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
           <span className="text-violet-400 font-bold text-sm">EP</span>
@@ -179,6 +179,7 @@ export default function JudgeQueue() {
                     value={rubric[crit as keyof typeof rubric]}
                     onChange={e => setRubric(r => ({ ...r, [crit]: parseInt(e.target.value) }))}
                     className="w-full accent-violet-500"
+                    aria-label={`${crit} score`}
                   />
                 </div>
               ))}
@@ -241,6 +242,6 @@ export default function JudgeQueue() {
           </div>
         </details>
       </div>
-    </div>
+    </main>
   );
 }

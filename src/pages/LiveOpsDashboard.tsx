@@ -143,7 +143,7 @@ export default function LiveOpsDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <main className="min-h-screen bg-slate-900">
       {/* Nav */}
       <nav className="border-b border-slate-700/50 px-4 py-3 flex items-center justify-between">
         <button onClick={() => navigate('/')} className="text-slate-400 hover:text-white text-sm flex items-center gap-1 transition-colors">
@@ -177,7 +177,7 @@ export default function LiveOpsDashboard() {
         {/* (a) LIVE COUNTERS STRIP */}
         <div>
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Live Event Counters</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div aria-live="polite" aria-label="Live event statistics" className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <CounterCard field="checkedIn" label="Checked In" value={`${stats.checkedIn}/${stats.totalRegistered}`} sub="of registered" />
             <CounterCard field="teamsFormed" label="Teams Formed" value={String(stats.teamsFormed)} />
             <CounterCard field="submissions" label="Submissions" value={String(stats.submissions)} />
@@ -294,6 +294,6 @@ export default function LiveOpsDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
