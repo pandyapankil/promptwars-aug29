@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Load local environment variables if present
+if [ -f "$(dirname "$0")/env.sh" ]; then
+  source "$(dirname "$0")/env.sh"
+fi
+
 echo "🚀 Deploying to Cloud Run..."
 
 gcloud run deploy promptwars-aug29 \
