@@ -19,29 +19,7 @@ const UNTEAMED_EXAMPLE = {
   note: 'Teamless past 11:00 AM deadline — see walk-in matching desk, Hall B',
 };
 
-const SEEDED_MATCHES: Match[] = [
-  {
-    participantId: 'uid-rohan',
-    name: 'Rohan Kulkarni',
-    skills: ['PyTorch', 'CI/CD', 'Python'],
-    reason: 'Strong PyTorch + CI/CD background; needs a UI/UX person — 92% fit',
-    fit: 92,
-  },
-  {
-    participantId: 'uid-rahul',
-    name: 'Rahul Verma',
-    skills: ['Node.js', 'Express', 'Firebase'],
-    reason: 'Full backend coverage with Firebase expertise; complements your design skills — 88% fit',
-    fit: 88,
-  },
-  {
-    participantId: 'uid-sneha',
-    name: 'Sneha Iyer',
-    skills: ['React Native', 'GraphQL', 'AWS'],
-    reason: 'Cross-platform focus + GraphQL; your Figma + React Native combo is ideal — 81% fit',
-    fit: 81,
-  },
-];
+// Removed SEEDED_MATCHES
 
 export default function FindMyTeam() {
   const navigate = useNavigate();
@@ -49,13 +27,11 @@ export default function FindMyTeam() {
   const [skills, setSkills] = useState('React, Figma, CSS');
   const [role, setRole] = useState('UI/UX Designer');
   const [interests, setInterests] = useState('AI/ML tools, Productivity apps');
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [invitedId, setInvitedId] = useState<string | null>(null);
-  const [inviteLoading, setInviteLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function runGeminiMatch() {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/gemini-match', {
         method: 'POST',
@@ -64,12 +40,15 @@ export default function FindMyTeam() {
       });
       if (res.ok) {
         const data = await res.json();
-        setMatches(data.matches ?? SEEDED_MATCHES);
+        setMatches(data.matches ?? []);
       } else {
-        setMatches(SEEDED_MATCHES);
+        const data = await res.json();
+        setError(data.error || '⚠ Gemini unavailable — retry');
+        setMatches([]);
       }
     } catch {
-      setMatches(SEEDED_MATCHES);
+      setError('⚠ Gemini unavailable — retry');
+      setMatches([]);
     } finally {
       setLoading(false);
     }
@@ -77,8 +56,6 @@ export default function FindMyTeam() {
 
   // Auto-run on mount to show matches immediately
   useEffect(() => {
-    setMatches(SEEDED_MATCHES);
-    // Try to fetch live Gemini matches in background
     runGeminiMatch();
   }, []);
 
@@ -172,7 +149,20 @@ export default function FindMyTeam() {
           </div>
         </div>
 
+        {error && (
+          <div className="flex flex-col items-center justify-center py-6 bg-slate-900/40 rounded-xl border border-red-500/30 mb-4">
+            <span className="text-red-400 mb-2 font-semibold">{error}</span>
+            <button
+              onClick={runGeminiMatch}
+              className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-500/50 text-red-300 text-sm font-semibold rounded-lg transition-colors"
+            >
+              Retry Connection
+            </button>
+          </div>
+        )}
+
         {/* Gemini match results */}
+        {!error && (
         <div>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
             ⚡ Gemini AI Matches
@@ -226,6 +216,7 @@ export default function FindMyTeam() {
             ))}
           </div>
         </div>
+        )}
 
         {/* UNTEAMED recovery state */}
         <div className="card border border-orange-500/30 bg-orange-500/5">

@@ -21,7 +21,7 @@ Respond ONLY with the summary.`;
     res.json({ summary });
   } catch (err) {
     console.error('Gemini judge summary error:', err.message);
-    res.json({ summary: 'This team demonstrated strong technical execution, but judges noted the presentation could be more cohesive. Focus on highlighting the real-world impact in the next round.' });
+    res.status(500).json({ error: '⚠ Gemini unavailable — retry' });
   }
 });
 

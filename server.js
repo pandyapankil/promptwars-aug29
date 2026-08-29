@@ -81,14 +81,7 @@ Respond ONLY with valid JSON in this exact format:
     res.json(parsed);
   } catch (err) {
     console.error('Gemini match error:', err.message);
-    // Return seeded fallback — never demo mode, just sensible defaults
-    res.json({
-      matches: [
-        { participantId: 'uid-rohan', name: 'Rohan Kulkarni', skills: ['PyTorch', 'CI/CD', 'Python'],       reason: 'Strong PyTorch + CI/CD background; needs a UI/UX person — 92% fit', fit: 92 },
-        { participantId: 'uid-rahul', name: 'Rahul Verma',    skills: ['Node.js', 'Express', 'Firebase'],   reason: 'Full backend coverage with Firebase expertise; complements design skills — 88% fit', fit: 88 },
-        { participantId: 'uid-sneha', name: 'Sneha Iyer',     skills: ['React Native', 'GraphQL', 'AWS'],   reason: 'Cross-platform + GraphQL; ideal pairing for Figma + React Native combo — 81% fit', fit: 81 },
-      ],
-    });
+    res.status(500).json({ error: '⚠ Gemini unavailable — retry' });
   }
 });
 
@@ -118,7 +111,7 @@ Body: ${body}`;
     res.json({ tldr });
   } catch (err) {
     console.error('Gemini TL;DR error:', err.message);
-    res.json({ tldr: `Urgent update regarding ${title}: Please review the full announcement for immediate action items.` });
+    res.status(500).json({ error: '⚠ Gemini unavailable — retry' });
   }
 });
 
@@ -158,7 +151,7 @@ Respond ONLY with JSON:
     res.json(JSON.parse(jsonMatch[0]));
   } catch (err) {
     console.error('Gemini analysis error:', err.message);
-    res.json({ variance: 22, criterion: 'Innovation', recommendation: 'Request both judges to re-evaluate Innovation criterion independently.', shouldFlag: true });
+    res.status(500).json({ error: '⚠ Gemini unavailable — retry' });
   }
 });
 

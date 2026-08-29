@@ -67,6 +67,7 @@ export default function AnnouncementCenter() {
   const [broadcasting, setBroadcasting] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>(DEFAULT_ANNOUNCEMENTS);
   const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     try {
@@ -88,22 +89,21 @@ export default function AnnouncementCenter() {
     if (!title.trim() || !body.trim()) return;
     setBroadcasting(true);
     setSuccess('');
+    setError('');
     try {
       // 1. Get Gemini TL;DR from server
       let tldr = '';
-      try {
-        const res = await fetch('/api/gemini-tldr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, body }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          tldr = data.tldr ?? '';
-        }
-      } catch {
-        // Fallback TL;DR
-        tldr = `${title.slice(0, 60)}${title.length > 60 ? '…' : ''}`;
+      const res = await fetch('/api/gemini-tldr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        tldr = data.tldr ?? '';
+      } else {
+        setError(data.error || '⚠ Gemini unavailable — retry');
+        return; // Stop broadcast
       }
 
       // 2. Write to Firestore
@@ -223,14 +223,32 @@ export default function AnnouncementCenter() {
               </div>
             )}
 
+            {error && (
+            <div className="flex flex-col items-center justify-center p-6 bg-slate-900/40 rounded-xl border border-red-500/30">
+              <span className="text-red-400 mb-4 font-semibold">{error}</span>
+              <button
+                onClick={handleBroadcast}
+                className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-500/50 text-red-300 text-sm font-semibold rounded-lg transition-colors"
+              >
+                Retry Broadcast
+              </button>
+            </div>
+          )}
+
+          {!error && (
             <button
               id="btn-broadcast"
               onClick={handleBroadcast}
               disabled={broadcasting || !title.trim() || !body.trim()}
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-sm transition-all disabled:opacity-50"
+              className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-60
+                ${severity === 'CRITICAL'
+                  ? 'bg-red-500 hover:bg-red-400 text-slate-900'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-900'
+                }`}
             >
-              {broadcasting ? '⚡ Generating TL;DR + Broadcasting…' : '📢 Broadcast to All Participants'}
+              {broadcasting ? '⚡ Gemini generating TL;DR…' : '🚀 Broadcast to all devices'}
             </button>
+          )}
           </div>
         </div>
 

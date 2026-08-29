@@ -27,6 +27,7 @@ export default function JudgeQueue() {
   const [rubric, setRubric] = useState({ functionality: 0, innovation: 0, presentation: 0, implementation: 0 });
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const totalScore = rubric.functionality + rubric.innovation + rubric.presentation + rubric.implementation;
 
@@ -73,17 +74,18 @@ export default function JudgeQueue() {
       
       // Call Gemini for summary via our new endpoint
       let judgeSummary = '';
-      try {
-        const res = await fetch('/api/judge-summary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feedback })
-        });
-        const data = await res.json();
-        judgeSummary = data.summary;
-      } catch (err) {
-        console.error('Failed to fetch Gemini summary', err);
+      const res = await fetch('/api/judge-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(data.error || '⚠ Gemini unavailable — retry');
+        setIsSubmitting(false);
+        return; // Abort submission
       }
+      judgeSummary = data.summary;
 
       try {
         // 1. Write Score
@@ -114,6 +116,7 @@ export default function JudgeQueue() {
       setActiveTeam(null); // Wait for next in queue
       setRubric({ functionality: 0, innovation: 0, presentation: 0, implementation: 0 });
       setFeedback('');
+      setError(null);
     } catch (e) {
       console.error('Submit error:', e);
     } finally {
@@ -191,13 +194,27 @@ export default function JudgeQueue() {
                 />
               </div>
 
-              <button 
+              {error && (
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-900/40 rounded-xl border border-red-500/30">
+                <span className="text-red-400 mb-3 font-semibold">{error}</span>
+                <button
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-500/50 text-red-300 text-sm font-semibold rounded-lg transition-colors"
+                >
+                  Retry Submission
+                </button>
+              </div>
+            )}
+
+            {!error && (
+              <button
                 onClick={handleSubmit}
-                disabled={isSubmitting || totalScore === 0}
-                className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-sm transition-all"
+                disabled={isSubmitting || totalScore === 0 || !feedback.trim()}
+                className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-sm transition-all mt-4"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit Score'}
+                {isSubmitting ? '⚡ Gemini compiling summary…' : 'Finalize & Submit Score'}
               </button>
+            )}
             </div>
           </div>
         ) : (
