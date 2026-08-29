@@ -3,7 +3,8 @@
 > Gemini: AI teammate matchmaking + announcement TL;DR + score variance.
 > QR code on Participant Home covers virtual check-in. CheckinScanner is the wow moment.
 > Cloud Storage for project file uploads. Explicit file names protect Template B regression rule.
-> Updated: adopted status state map, file names, Cloud Storage, CheckinScanner from parallel AI review.
+> FORMAT: 2 submissions total, deadline 5:00 PM. Template A = Submission 1 baseline.
+> Must be deployable and scoreable on its own. Template B+C layer on top for Submission 2.
 
 ---
 
