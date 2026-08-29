@@ -14,7 +14,7 @@ Firebase Project ID:     promptwars-aug29
 Cloud Run Service Name:  promptwars-aug29
 Region:                  asia-south1
 GitHub Repo URL:         https://github.com/pandyapankil/promptwars-aug29.git
-Live Cloud Run URL:      NOT_YET_DEPLOYED (will be generated on first ./deploy.sh)
+Live Cloud Run URL:      https://promptwars-aug29-yujtd6zcea-el.a.run.app
 
 Firebase Config:
 const firebaseConfig = {
