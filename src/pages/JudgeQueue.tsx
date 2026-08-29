@@ -85,26 +85,30 @@ export default function JudgeQueue() {
         console.error('Failed to fetch Gemini summary', err);
       }
 
-      // 1. Write Score
-      await addDoc(collection(db, 'scores'), {
-        teamId: activeTeam.id,
-        judgeId: 'prof-meera',
-        criteria: rubric,
-        total: totalScore,
-        feedback,
-        judgeSummary,
-        submittedAt: serverTimestamp()
-      });
+      try {
+        // 1. Write Score
+        await addDoc(collection(db, 'scores'), {
+          teamId: activeTeam.id,
+          judgeId: 'prof-meera',
+          criteria: rubric,
+          total: totalScore,
+          feedback,
+          judgeSummary,
+          submittedAt: serverTimestamp()
+        });
 
-      // 2. Update Team submissionStatus
-      await updateDoc(doc(db, 'teams', activeTeam.id), {
-        submissionStatus: 'SCORED'
-      });
+        // 2. Update Team submissionStatus
+        await updateDoc(doc(db, 'teams', activeTeam.id), {
+          submissionStatus: 'SCORED'
+        });
 
-      // 3. Increment Judging Counter in Stats
-      await updateDoc(doc(db, 'stats', 'live'), {
-        judgingComplete: increment(1)
-      });
+        // 3. Increment Judging Counter in Stats
+        await updateDoc(doc(db, 'stats', 'live'), {
+          judgingComplete: increment(1)
+        });
+      } catch (writeErr) {
+        console.warn('Firestore write skipped (using optimistic UI):', writeErr);
+      }
 
       // Mock moving to next submission
       setActiveTeam(null); // Wait for next in queue
