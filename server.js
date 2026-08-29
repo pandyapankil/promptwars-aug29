@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 8080; // NEVER hardcode — Cloud Run sets $POR
 
 app.use(cors());
 app.use(express.json());
+app.use(require(require('fs').existsSync('./geminiRoutes.js') ? './geminiRoutes' : './dist/geminiRoutes.js'));
 
 // Serve Vite build output
 app.use(express.static(path.join(__dirname, 'dist')));
