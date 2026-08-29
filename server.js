@@ -118,7 +118,7 @@ Body: ${body}`;
     res.json({ tldr });
   } catch (err) {
     console.error('Gemini TL;DR error:', err.message);
-    res.json({ tldr: `${title} — check announcement for details.` });
+    res.json({ tldr: `Urgent update regarding ${title}: Please review the full announcement for immediate action items.` });
   }
 });
 
